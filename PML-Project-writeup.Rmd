@@ -1,0 +1,126 @@
+---
+title: "PML-Project"
+author: "Shereen Jones"
+date: "August 23, 2015"
+output: html_document
+keep_md: yes
+---
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+## The Data
+The training data for this project are available here: 
+     https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+The test data are available here: 
+     https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+## Load Libraries to be used in this exercise
+```{r loadlibs}
+library (ggplot2)
+library (caret)
+library (plyr)
+library (dplyr)
+library (gridExtra)
+library (downloader)
+library (gbm)
+library (rattle)
+library (randomForest)
+```
+
+## Get the Data
+The files - a training file and a testing file - will be downloaded if they do not already exist in the working directory. After which the files will be loaded.
+
+```{r getdata}
+
+fn1 <- "pml-training.csv"
+URL1 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+if (!file.exists(fn1)) {
+     download.file (URL1, fn1, method="wininet")
+}
+
+fn2 <- "pml-testing.csv"
+URL2 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+if (!file.exists(fn2)) {
+     download.file (URL2, fn2, method="wininet")
+}
+
+traindata <- read.csv(fn1)
+testdata <- read.csv(fn2)
+```
+
+## Split the training data into two data sets for training and validation purposes
+```{r splitdata}
+inTrain2 <- createDataPartition(y=traindata$classe, p=0.75, list=FALSE)
+traintrain <- traindata[inTrain2,]
+traintest <- traindata[-inTrain2,]
+```
+
+## Clean up the datasets
+
+The first transformation will be to remove near zero variance variables
+```{r process_nzv}
+nzv <- nearZeroVar(traindata)
+## Apply transformation to all datasets
+traintrain <- traintrain[, -nzv]
+traintest <- traintest[, -nzv]
+testdata <- testdata[, -nzv]
+```
+
+The second transformation will be to remove the high NA threshold variables
+
+```{r  cleandata}
+highNA <- sapply(traintrain, function(x) mean(is.na(x))) > 0.95
+## Apply transformation to all datasets
+traintrain <- traintrain[, highNA==FALSE]
+traintest <- traintest[, highNA==FALSE]
+testdata <- testdata[, highNA==FALSE]
+```
+
+The third transformation will be to remove fields that have no impact on the prediction exercise - X and user.
+
+```{r removecols}
+traintrain <- traintrain[, 3:length(traintrain)]
+traintest <- traintest[, 3:length(traintest)]
+testdata <- testdata[, 3:length(testdata)]
+```
+
+## Fit a boosted tree model
+
+A boosted tree model is fitted to the training subset of the training data, and then validated against the test subset of the training data.  If at a suitable level of accuracy, as indicated by the confusion matrix, then this model will be applied to the test set.
+
+```{r gbm}
+set.seed(72719)
+model1b <- train(classe ~ ., data=traintrain, method="gbm")
+pred1 <- predict(model1b, newdata=traintest)
+cm <- confusionMatrix(pred1, traintest$classe)
+print(cm, digits=4)
+```
+
+The out of sample error is 1-0.9947 = 0.0053.
+
+It was intended to also test with a random forest method, but time did not permit same for the writeup.  Further the initial run resulted in an accuracy of 0.9984 - only moderately better than the boosted tree model, and hence deemed not worth the extra processing time.
+
+Now applying the model to test data set.
+
+## Prepare Final Model
+
+```{r finalmodel}
+set.seed(72719)
+finalPred <- predict(model1b, newdata=testdata)
+```
+
+## Applying code for submission
+
+```{r submission_code}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(finalPred)
+```
