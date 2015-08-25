@@ -2,9 +2,15 @@
 title: "PML-Project"
 author: "Shereen Jones"
 date: "August 23, 2015"
-output: html_document
+output: 
+  html_document: 
+    keep_md: yes
 keep_md: yes
 ---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE)
+```
 
 ## Background
 
@@ -92,7 +98,7 @@ A boosted tree model is fitted to the training subset of the training data, and 
 
 ```{r gbm}
 set.seed(72719)
-model1b <- train(classe ~ ., data=traintrain, method="gbm")
+model1b <- train(classe ~ ., data=traintrain, method="gbm", verbose=FALSE)
 pred1 <- predict(model1b, newdata=traintest)
 cm <- confusionMatrix(pred1, traintest$classe)
 print(cm, digits=4)
@@ -100,18 +106,27 @@ print(cm, digits=4)
 
 The out of sample error is 1-0.9947 = 0.0053.
 
+Show the plot giving the comparison between the predicted values and the actual values of the validation set.
+
+```{r validation, echo=FALSE}
+df <- data.frame(pred1, traintest$classe)
+names(df) <- c("predict","actual")
+df$count <- rep(1, nrow(df))
+df2 <- aggregate(count ~ predict + actual, data=df, sum)
+qplot(predict, actual, data=df2, main="Prediction vs Actual for Validation Subset") + geom_point(aes(size=count))
+```
+
 It was intended to also test with a random forest method, but time did not permit same for the writeup.  Further the initial run resulted in an accuracy of 0.9984 - only moderately better than the boosted tree model, and hence deemed not worth the extra processing time.
 
 Now applying the model to test data set.
 
-## Prepare Final Model
+## Apply Final Model
 
 ```{r finalmodel}
-set.seed(72719)
 finalPred <- predict(model1b, newdata=testdata)
 ```
 
-## Applying code for submission
+## Applying code for submission of files
 
 ```{r submission_code}
 pml_write_files = function(x){
@@ -124,3 +139,5 @@ pml_write_files = function(x){
 
 pml_write_files(finalPred)
 ```
+
+Files were submitted and accepted.
